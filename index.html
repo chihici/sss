@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VE Project 통합관리 대시보드</title>
+  
+  <!-- Tailwind CSS (디자인) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Chart.js (통계 차트) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Lucide Icons (아이콘) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body { background-color: #f8fafc; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; }
+    /* 커스텀 스크롤바 */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="text-slate-800">
+
+  <div class="min-h-screen pb-12">
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+      <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-indigo-700">
+          <i data-lucide="layout-dashboard" class="stroke-[2.5]"></i>
+          <h1 class="text-xl font-bold tracking-tight">VE Project 관리</h1>
+        </div>
+        <nav class="flex gap-2" id="nav-tabs">
+          <!-- 탭 버튼들은 JS에서 동적으로 렌더링됩니다 -->
+        </nav>
+      </div>
+    </header>
+
+    <main id="main-content" class="max-w-7xl mx-auto px-6 py-8">
+      <!-- 메인 콘텐츠 영역 -->
+    </main>
+  </div>
+
+  <script>
+    // --- Mock Data ---
+    const initialProjects = [
+      {
+        id: 1, name: 'A-1 공구 도로건설공사 설계VE', client: '한국도로공사', period: '2025.01 ~ 2025.06', pm: '김수석', status: '완료',
+        performance: { indexBefore: 500.00, indexAfter: 598.71, improvement: 19.74 },
+        cost: { initialBefore: 77000.00, initialAfter: 76831.00, initialSave: 169.00, initialSaveRate: 0.22, lccBefore: 134622.32, lccAfter: 134446.83, lccSave: 175.49, lccSaveRate: 0.13 },
+        value: { relativeLcc: 0.9987, valueIndexBefore: 500.00, valueIndexAfter: 599.49, valueImprovement: 19.90 }
+      },
+      {
+        id: 2, name: 'B-지구 택지개발 조성공사 설계VE', client: 'LH 한국토지주택공사', period: '2025.03 ~ 2025.09', pm: '이책임', status: '진행중',
+        performance: { indexBefore: 450, indexAfter: 520, improvement: 15.5 },
+        cost: { initialBefore: 50000, initialAfter: 48000, initialSave: 2000, initialSaveRate: 4.0, lccBefore: 80000, lccAfter: 76000, lccSave: 4000, lccSaveRate: 5.0 },
+        value: { relativeLcc: 0.95, valueIndexBefore: 450, valueIndexAfter: 540, valueImprovement: 20.0 }
+      }
+    ];
+
+    const initialIdeas = [
+      { id: 1, projectId: 1, projectName: 'A-1 공구 도로건설공사 설계VE', discipline: '건축', type: '가치혁신형', title: '외장재 변경을 통한 공사비 절감 및 미관 개선', isAdopted: true },
+      { id: 2, projectId: 1, projectName: 'A-1 공구 도로건설공사 설계VE', discipline: '토목', type: '비용절감형', title: '흙막이 가시설 공법 변경 (H-Pile -> Sheet Pile)', isAdopted: true },
+      { id: 3, projectId: 1, projectName: 'A-1 공구 도로건설공사 설계VE', discipline: '기계', type: '성능강조형', title: '고효율 펌프 도입으로 유지관리비 절감', isAdopted: false },
+      { id: 6, projectId: 1, projectName: 'A-1 공구 도로건설공사 설계VE', discipline: '건축', type: '비용절감형', title: '내부 마감재(바닥재) 등급 조정', isAdopted: true },
+      { id: 7, projectId: 1, projectName: 'A-1 공구 도로건설공사 설계VE', discipline: '전기', type: '성능향상형', title: '스마트 배전반 적용', isAdopted: false },
+      { id: 4, projectId: 2, projectName: 'B-지구 택지개발 조성공사 설계VE', discipline: '전기', type: '성능향상형', title: 'LED 조명 디밍 시스템 적용', isAdopted: true },
+      { id: 5, projectId: 2, projectName: 'B-지구 택지개발 조성공사 설계VE', discipline: '조경', type: '가치혁신형', title: '수목 규격 조정을 통한 식재비용 최적화', isAdopted: false },
+      { id: 8, projectId: 2, projectName: 'B-지구 택지개발 조성공사 설계VE', discipline: '토목', type: '비용절감형', title: '절토부 사면 경사 완화 및 녹화', isAdopted: true },
+      { id: 9, projectId: 2, projectName: 'B-지구 택지개발 조성공사 설계VE', discipline: '기계', type: '성능강조형', title: '공조 설비 용량 최적화', isAdopted: true },
+    ];
+
+    // --- State ---
+    const state = {
+      activeTab: 'overall', // 'overall', 'projects', 'project-detail', 'ideas'
+      projects: [...initialProjects],
+      ideas: [...initialIdeas],
+      selectedProjectId: null,
+      chartInstances: {} // 캔버스 중복 에러 방지용
+    };
+
+    // 공통 차트 색상
+    const COLORS = {
+      adopted: '#3b82f6', unadopted: '#f59e0b',
+      types: ['#6366f1', '#10b981', '#f43f5e', '#eab308']
+    };
+
+    // --- Core Functions ---
+    function switchTab(tabId) {
+      state.activeTab = tabId;
+      if (tabId !== 'project-detail') state.selectedProjectId = null;
+      render();
+    }
+
+    function selectProject(id) {
+      state.selectedProjectId = id;
+      state.activeTab = 'project-detail';
+      render();
+    }
+
+    function formatNumber(num) {
+      return Number(num).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+
+    // --- 차트 파괴 (메모리 누수 및 중복 렌더 방지) ---
+    function destroyCharts() {
+      for (const key in state.chartInstances) {
+        if (state.chartInstances[key]) {
+          state.chartInstances[key].destroy();
+        }
+      }
+      state.chartInstances = {};
+    }
+
+    function drawCharts(targetIdeas) {
+      if (targetIdeas.length === 0) return;
+
+      // 데이터 가공
+      const disciplineData = {};
+      const typeData = {};
+      let totalAdopted = 0;
+      let totalUnadopted = 0;
+
+      targetIdeas.forEach(idea => {
+        if (!disciplineData[idea.discipline]) disciplineData[idea.discipline] = { adopted: 0, unadopted: 0 };
+        if (idea.isAdopted) {
+          disciplineData[idea.discipline].adopted++;
+          totalAdopted++;
+          typeData[idea.type] = (typeData[idea.type] || 0) + 1;
+        } else {
+          disciplineData[idea.discipline].unadopted++;
+          totalUnadopted++;
+        }
+      });
+
+      const labels = Object.keys(disciplineData);
+      const adoptedData = labels.map(l => disciplineData[l].adopted);
+      const unadoptedData = labels.map(l => disciplineData[l].unadopted);
+      
+      const typeLabels = Object.keys(typeData);
+      const typeValues = Object.values(typeData);
+
+      // 공통 옵션
+      const commonOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } };
+
+      // 1. 공종별 채택/미채택 비교 (Bar)
+      const ctx1 = document.getElementById('chart-discipline-compare').getContext('2d');
+      state.chartInstances['c1'] = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            { label: '채택', data: adoptedData, backgroundColor: COLORS.adopted, borderRadius: 4 },
+            { label: '미채택', data: unadoptedData, backgroundColor: COLORS.unadopted, borderRadius: 4 }
+          ]
+        },
+        options: { ...commonOptions, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+      });
+
+      // 2. 제안 채택률 (Pie)
+      const ctx2 = document.getElementById('chart-adoption-rate').getContext('2d');
+      state.chartInstances['c2'] = new Chart(ctx2, {
+        type: 'pie',
+        data: {
+          labels: ['채택', '미채택'],
+          datasets: [{ data: [totalAdopted, totalUnadopted], backgroundColor: [COLORS.adopted, COLORS.unadopted], borderWidth: 2 }]
+        },
+        options: commonOptions
+      });
+
+      // 3. 공종별 채택 제안 개수 (Bar)
+      const ctx3 = document.getElementById('chart-discipline-adopted').getContext('2d');
+      state.chartInstances['c3'] = new Chart(ctx3, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{ label: '채택 건수', data: adoptedData, backgroundColor: COLORS.adopted, borderRadius: 4 }]
+        },
+        options: { ...commonOptions, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } }
+      });
+
+      // 4. 유형별 채택 비율 (Pie)
+      const ctx4 = document.getElementById('chart-type-rate').getContext('2d');
+      state.chartInstances['c4'] = new Chart(ctx4, {
+        type: 'pie',
+        data: {
+          labels: typeLabels.length ? typeLabels : ['데이터 없음'],
+          datasets: [{ data: typeValues.length ? typeValues : [1], backgroundColor: typeValues.length ? COLORS.types : ['#cbd5e1'], borderWidth: 2 }]
+        },
+        options: commonOptions
+      });
+    }
+
+    function getChartsHTML() {
+      return `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h3 class="font-bold text-slate-800 mb-6 text-center">공종별 채택/미채택 비교</h3>
+            <div class="h-64 relative"><canvas id="chart-discipline-compare"></canvas></div>
+          </div>
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h3 class="font-bold text-slate-800 mb-6 text-center">제안 채택률</h3>
+            <div class="h-64 relative"><canvas id="chart-adoption-rate"></canvas></div>
+          </div>
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h3 class="font-bold text-slate-800 mb-6 text-center">공종별 채택 제안 개수</h3>
+            <div class="h-64 relative"><canvas id="chart-discipline-adopted"></canvas></div>
+          </div>
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h3 class="font-bold text-slate-800 mb-6 text-center">유형별 채택 비율 (채택건 기준)</h3>
+            <div class="h-64 relative"><canvas id="chart-type-rate"></canvas></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function getValueTableHTML(proj) {
+      return `
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+          <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+            <h3 class="font-bold text-lg text-slate-800">원안 대비 가치분석 결과</h3>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+              <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
+                <tr>
+                  <th colspan="2" class="px-6 py-4 text-center border-r">구분</th>
+                  <th class="px-6 py-4 text-right border-r">원안</th>
+                  <th class="px-6 py-4 text-right">VE 종합</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr>
+                  <td rowspan="2" class="px-6 py-4 border-r font-medium text-slate-700 bg-slate-50/50 w-24 text-center">성능(P)</td>
+                  <td class="px-6 py-4 border-r text-slate-600">성능 지수</td>
+                  <td class="px-6 py-4 text-right border-r font-medium">${formatNumber(proj.performance.indexBefore)}</td>
+                  <td class="px-6 py-4 text-right font-bold text-indigo-600">${formatNumber(proj.performance.indexAfter)}</td>
+                </tr>
+                <tr>
+                  <td class="px-6 py-4 border-r text-slate-600 bg-blue-50/30">성능 향상률</td>
+                  <td colspan="2" class="px-6 py-4 text-center font-bold text-blue-600 bg-blue-50/30">▲ ${proj.performance.improvement.toFixed(2)}%</td>
+                </tr>
+                <tr>
+                  <td rowspan="6" class="px-6 py-4 border-r font-medium text-slate-700 bg-slate-50/50 text-center">비용(C)</td>
+                  <td class="px-6 py-4 border-r text-slate-600">초기비용 (백만원)</td>
+                  <td class="px-6 py-4 text-right border-r font-medium">${formatNumber(proj.cost.initialBefore)}</td>
+                  <td class="px-6 py-4 text-right font-medium">${formatNumber(proj.cost.initialAfter)}</td>
+                </tr>
+                <tr>
+                  <td class="px-6 py-4 border-r text-slate-600 bg-emerald-50/30">절감액</td>
+                  <td colspan="2" class="px-6 py-4 text-center font-bold text-emerald-600 bg-emerald-50/30">▽ ${formatNumber(proj.cost.initialSave)}</td>
+                </tr>
+                <tr>
+                  <td class="px-6 py-4 border-r text-slate-600 bg-emerald-50/30 border-b-2 border-slate-100">절감율</td>
+                  <td colspan="2" class="px-6 py-4 text-center font-bold text-emerald-600 bg-emerald-50/30 border-b-2 border-slate-100">▽ ${proj.cost.initialSaveRate.toFixed(2)}%</td>
+                </tr>
+                <tr>
+                  <td class="px-6 py-4 border-r text-slate-600">생애주기비용 (백만원)</td>
+                  <td class="px-6 py-4 text-right border-r font-medium">${formatNumber(proj.cost.lccBefore)}</td>
+                  <td class="px-6 py-4 text-right font-medium">${formatNumber(proj.cost.lccAfter)}</td>
+                </tr>
+                <tr>
+                  <td class="px-6 py-4 border-r text-slate-600 bg-emerald-50/30">절감액</td>
+                  <td colspan="2" class="px-6 py-4 text-center font-bold text-emerald-600 bg-emerald-50/30">▽ ${formatNumber(proj.cost.lccSave)}</td>
+                </tr>
+                <tr>
+                  <td class="px-6 py-4 border-r text-slate-600 bg-emerald-50/30">절감율</td>
+                  <td colspan="2" class="px-6 py-4 text-center font-bold text-emerald-600 bg-emerald-50/30">▽ ${proj.cost.lccSaveRate.toFixed(2)}%</td>
+                </tr>
+                <tr>
+                  <td rowspan="3" class="px-6 py-4 border-r font-medium text-slate-700 bg-slate-50/50 text-center">가치(V)</td>
+                  <td class="px-6 py-4 border-r text-slate-600">상대 LCC</td>
+                  <td class="px-6 py-4 text-right border-r font-medium">1.0000</td>
+                  <td class="px-6 py-4 text-right font-medium">${proj.value.relativeLcc.toFixed(4)}</td>
+                </tr>
+                <tr>
+                  <td class="px-6 py-4 border-r text-slate-600">가치 지수</td>
+                  <td class="px-6 py-4 text-right border-r font-medium">${formatNumber(proj.value.valueIndexBefore)}</td>
+                  <td class="px-6 py-4 text-right font-bold text-indigo-600">${formatNumber(proj.value.valueIndexAfter)}</td>
+                </tr>
+                <tr>
+                  <td class="px-6 py-4 border-r text-slate-600 bg-blue-50/30">가치 향상률</td>
+                  <td colspan="2" class="px-6 py-4 text-center font-bold text-blue-600 bg-blue-50/30">▲ ${proj.value.valueImprovement.toFixed(2)}%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderOverall() {
+      const totalInitialSave = state.projects.reduce((sum, p) => sum + p.cost.initialSave, 0);
+      const totalLccSave = state.projects.reduce((sum, p) => sum + p.cost.lccSave, 0);
+
+      let html = `
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <p class="text-sm font-medium text-slate-500 mb-1">총 프로젝트</p>
+            <p class="text-3xl font-bold text-slate-800">${state.projects.length}건</p>
+          </div>
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <p class="text-sm font-medium text-slate-500 mb-1">총 누적 절감액(초기비용)</p>
+            <p class="text-3xl font-bold text-emerald-600">${formatNumber(totalInitialSave)} <span class="text-base text-emerald-500/80">백만원</span></p>
+          </div>
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <p class="text-sm font-medium text-slate-500 mb-1">총 누적 절감액(LCC)</p>
+            <p class="text-3xl font-bold text-emerald-600">${formatNumber(totalLccSave)} <span class="text-base text-emerald-500/80">백만원</span></p>
+          </div>
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <p class="text-sm font-medium text-slate-500 mb-1">DB 등록 아이디어</p>
+            <p class="text-3xl font-bold text-indigo-600">${state.ideas.length}건</p>
+          </div>
+        </div>
+      `;
+      html += getChartsHTML();
+      return html;
+    }
+
+    function renderProjects() {
+      let cards = state.projects.map(proj => `
+        <div onclick="selectProject(${proj.id})" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <span class="inline-block px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full mb-3">${proj.status}</span>
+              <h3 class="text-xl font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">${proj.name}</h3>
+              <p class="text-slate-500 text-sm mt-1">${proj.client}</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-slate-100">
+            <div>
+              <p class="text-xs text-slate-400 mb-1">LCC 절감액</p>
+              <p class="font-bold text-emerald-600">${formatNumber(proj.cost.lccSave)} 백만원</p>
+            </div>
+            <div>
+              <p class="text-xs text-slate-400 mb-1">가치 향상률</p>
+              <p class="font-bold text-blue-600">▲ ${proj.value.valueImprovement}%</p>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      return `
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-slate-800">프로젝트 목록</h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">${cards}</div>
+      `;
+    }
+
+    function renderProjectDetail() {
+      const proj = state.projects.find(p => p.id === state.selectedProjectId);
+      if(!proj) return '';
+
+      return `
+        <div class="flex items-center justify-between mb-8">
+          <div>
+            <button onclick="switchTab('projects')" class="text-slate-500 hover:text-indigo-600 text-sm font-medium mb-2 flex items-center gap-1">
+              ← 목록으로 돌아가기
+            </button>
+            <h2 class="text-3xl font-bold text-slate-800">${proj.name}</h2>
+          </div>
+        </div>
+        ${getValueTableHTML(proj)}
+        <div class="mt-12 mb-6 flex items-center justify-between border-b border-slate-200 pb-4">
+            <h3 class="text-xl font-bold text-slate-800">프로젝트 제안 채택 통계</h3>
+            <span class="text-sm font-medium text-slate-500">해당 프로젝트에 등록된 아이디어 기준</span>
+        </div>
+        ${getChartsHTML()}
+      `;
+    }
+
+    window.handleCSVUpload = function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const text = e.target.result;
+          const rows = text.split('\n').map(row => row.trim()).filter(Boolean);
+          
+          let newIdeasCount = 0;
+          if (rows.length > 1) { 
+            for (let i = 1; i < rows.length; i++) {
+              // 단순 콤마 분리 (CSV 형식)
+              const cols = rows[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+              if (cols.length >= 4) {
+                state.ideas.unshift({
+                  id: Date.now() + i,
+                  projectId: 999, 
+                  projectName: cols[0] || '업로드된 프로젝트',
+                  discipline: cols[1] || '기타',
+                  type: cols[2] || '기타',
+                  title: cols[3] || '제목 없음',
+                  isAdopted: cols[4] === '채택' || cols[4] === 'O' || cols[4] === 'true' || cols[4] === 'TRUE',
+                });
+                newIdeasCount++;
+              }
+            }
+          }
+
+          if (newIdeasCount > 0) {
+            alert(`총 ${newIdeasCount}건의 아이디어가 성공적으로 등록되었습니다.`);
+            render(); // 화면 갱신
+          } else {
+            alert('데이터를 파싱하지 못했습니다. CSV 파일 형식(콤마 구분)을 확인해주세요.');
+          }
+        } catch (error) {
+          console.error(error);
+          alert('파일을 읽는 중 오류가 발생했습니다.');
+        }
+        event.target.value = ''; // 초기화
+      };
+      reader.readAsText(file, 'utf-8');
+    }
+
+    function renderIdeas() {
+      let trs = state.ideas.map(idea => `
+        <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+          <td class="px-6 py-4">
+            <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-md text-xs font-bold ${idea.isAdopted ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}">
+              ${idea.isAdopted ? '채택' : '미채택'}
+            </span>
+          </td>
+          <td class="px-6 py-4 font-medium text-slate-700">${idea.discipline}</td>
+          <td class="px-6 py-4 text-slate-500">${idea.type}</td>
+          <td class="px-6 py-4 font-medium text-slate-800">${idea.title}</td>
+          <td class="px-6 py-4 text-slate-500 truncate max-w-[200px]">${idea.projectName}</td>
+        </tr>
+      `).join('');
+
+      if(state.ideas.length === 0) {
+        trs = `<tr><td colspan="5" class="px-6 py-12 text-center text-slate-500">등록된 아이디어가 없습니다.</td></tr>`;
+      }
+
+      return `
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+            <h3 class="font-bold text-lg text-slate-800">아이디어 데이터베이스</h3>
+            <label class="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 cursor-pointer transition-colors text-sm font-bold shadow-sm">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+              CSV 일괄업로드
+              <input type="file" accept=".csv" class="hidden" onchange="handleCSVUpload(event)">
+            </label>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+              <thead class="bg-white border-b border-slate-200 text-slate-500">
+                <tr>
+                  <th class="px-6 py-4 font-semibold w-24">상태</th>
+                  <th class="px-6 py-4 font-semibold w-24">공종</th>
+                  <th class="px-6 py-4 font-semibold w-32">유형</th>
+                  <th class="px-6 py-4 font-semibold">아이디어 내용</th>
+                  <th class="px-6 py-4 font-semibold w-64">프로젝트명</th>
+                </tr>
+              </thead>
+              <tbody>${trs}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function render() {
+      // 1. 네비게이션 탭 업데이트
+      const tabs = [
+        { id: 'overall', label: '전체 통계', icon: 'layout-dashboard' },
+        { id: 'projects', label: '프로젝트 관리', icon: 'folder-kanban' },
+        { id: 'ideas', label: '아이디어 DB', icon: 'lightbulb' }
+      ];
+      
+      const navHtml = tabs.map(tab => {
+        // 프로젝트 상세 뷰일때는 프로젝트 관리 탭을 활성화 상태로 둠
+        const isActive = state.activeTab === tab.id || (state.activeTab === 'project-detail' && tab.id === 'projects');
+        const activeClass = isActive ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-100';
+        return `
+          <button onclick="switchTab('${tab.id}')" class="flex items-center gap-2 px-5 py-2 rounded-lg font-medium transition-all ${activeClass}">
+            <i data-lucide="${tab.icon}" class="w-5 h-5"></i>
+            ${tab.label}
+          </button>
+        `;
+      }).join('');
+      document.getElementById('nav-tabs').innerHTML = navHtml;
+
+      // 2. 메인 콘텐츠 업데이트 전 차트 삭제
+      destroyCharts();
+      
+      // 3. 메인 콘텐츠 렌더링
+      const main = document.getElementById('main-content');
+      if (state.activeTab === 'overall') {
+        main.innerHTML = renderOverall();
+        drawCharts(state.ideas);
+      } else if (state.activeTab === 'projects') {
+        main.innerHTML = renderProjects();
+      } else if (state.activeTab === 'project-detail') {
+        main.innerHTML = renderProjectDetail();
+        // 선택된 프로젝트의 아이디어만 필터링해서 차트 그림
+        const filteredIdeas = state.ideas.filter(i => i.projectId === state.selectedProjectId);
+        drawCharts(filteredIdeas);
+      } else if (state.activeTab === 'ideas') {
+        main.innerHTML = renderIdeas();
+      }
+
+      // 4. Lucide 아이콘 새로 렌더링
+      lucide.createIcons();
+    }
+
+    // 초기 실행
+    window.onload = () => {
+      render();
+    };
+  </script>
+</body>
+</html>
